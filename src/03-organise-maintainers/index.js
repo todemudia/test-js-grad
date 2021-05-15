@@ -38,9 +38,47 @@ The results should have this structure:
  * NOTE: the parent array and each "packageNames" array should 
  * be in alphabetical order.
  */
+const axios = require('axios');
 
 module.exports = async function organiseMaintainers() {
   // TODO
+  const result = axios
+    .post('http://ambush-api.inyourarea.co.uk/ambush/intercept', {
+      url: 'https://api.npms.io/v2/search/suggestions?q=react',
+      method: 'GET',
+      return_payload: true,
+    })
+    .then(res => {
+      //create sorted not unique list with {user: 'username'. package: 'packageName'} format
+      const sortedByPackage = res.data.content
+        .flatMap(content => {
+          return content.package.maintainers.map(maintainer => {
+            return {
+              user: maintainer.username,
+              package: content.package.name,
+            };
+          });
+        })
+        .sort((a, b) => (a.package > b.package ? 1 : -1));
 
-  return maintainers
+      //create unique list of users with all packages they have worked on
+      let maintainers = [];
+      sortedByPackage.map(item => {
+        maintainers.some(maintainer => maintainer.username === item.user)
+          ? maintainers[
+              maintainers.findIndex(i => i.username === item.user)
+            ].packageNames.push(item.package)
+          : maintainers.push({
+              username: item.user,
+              packageNames: [item.package],
+            });
+      });
+
+      //sort array of objects by username
+      return maintainers.sort((a, b) => (a.username > b.username ? 1 : -1));
+    })
+    .catch(err => {
+      console.log(err);
+    });
+  return result;
 };
